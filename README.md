@@ -16,6 +16,83 @@ ReactとTypeScriptで作成されたSSL証明書生成アプリケーション�
 - Material-UI v5
 - node-forge（証明書生成ライブラリ）
 
+## 証明書生成の技術詳細
+
+### 使用ライブラリ
+- **node-forge** (バージョン 1.3.1)
+  - メインの証明書生成ライブラリ
+  - クライアントサイドでの暗号化処理を実現
+  - ブラウザ環境で完全に動作（サーバー不要）
+
+### 実装機能
+1. **鍵ペア生成**
+   ```typescript
+   const keys = forge.pki.rsa.generateKeyPair(parseInt(formData.keySize));
+   const privateKey = keys.privateKey;
+   const publicKey = keys.publicKey;
+   ```
+
+2. **X.509証明書の作成**
+   ```typescript
+   const cert = forge.pki.createCertificate();
+   cert.publicKey = publicKey;
+   cert.serialNumber = '01';
+   cert.validity.notBefore = new Date();
+   cert.validity.notAfter = new Date();
+   cert.validity.notAfter.setDate(cert.validity.notAfter.getDate() + parseInt(formData.validityDays));
+   ```
+
+3. **証明書属性の設定**
+   ```typescript
+   const attrs = [
+     { name: 'commonName', value: formData.commonName },
+     { name: 'organizationName', value: formData.organization },
+     { name: 'organizationalUnitName', value: formData.organizationalUnit },
+     { name: 'localityName', value: formData.locality },
+     { name: 'stateOrProvinceName', value: formData.state },
+     { name: 'countryName', value: formData.country },
+     { name: 'emailAddress', value: formData.email }
+   ];
+   ```
+
+4. **証明書の署名**
+   ```typescript
+   cert.sign(privateKey, forge.md.sha256.create());
+   ```
+
+5. **PEM形式への変換**
+   ```typescript
+   const pem = {
+     privateKey: forge.pki.privateKeyToPem(privateKey),
+     publicKey: forge.pki.publicKeyToPem(publicKey),
+     certificate: forge.pki.certificateToPem(cert)
+   };
+   ```
+
+### サポートされる暗号化設定
+
+- **鍵サイズ**
+  - 1024ビット（非推奨）
+  - 2048ビット（デフォルト、推奨）
+  - 4096ビット（より強力）
+
+- **暗号化アルゴリズム**
+  - RSA（デフォルト）
+  - SHA-256（署名用ハッシュ）
+
+- **証明書形式**
+  - X.509 v3
+  - PEMエンコード
+
+### セキュリティ特性
+
+- クライアントサイドでの完全な処理
+  - 秘密鍵がサーバーに送信されることはない
+  - すべての暗号化処理がブラウザ内で実行
+- 自己署名証明書として生成
+- カスタマイズ可能な有効期限
+- 標準的なX.509属性をサポート
+
 ## インストール方法
 
 ```bash
