@@ -19,6 +19,17 @@ export interface GeneratedCertificate {
   certificate: string;
 }
 
+export const getLocalIPAddress = async (): Promise<string> => {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip;
+  } catch (error) {
+    console.error('IPアドレスの取得に失敗しました:', error);
+    return window.location.hostname;
+  }
+};
+
 export const generateCertificate = (formData: CertificateFormData): GeneratedCertificate => {
   // 鍵ペアの生成
   const keys = forge.pki.rsa.generateKeyPair(parseInt(formData.keySize));

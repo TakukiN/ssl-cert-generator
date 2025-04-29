@@ -16,7 +16,7 @@ import {
   DialogActions,
   SelectChangeEvent,
 } from '@mui/material';
-import { generateCertificate, CertificateFormData, GeneratedCertificate } from '../utils/certificateGenerator';
+import { generateCertificate, CertificateFormData, GeneratedCertificate, getLocalIPAddress } from '../utils/certificateGenerator';
 
 const CertificateForm: React.FC = () => {
   const [formData, setFormData] = useState<CertificateFormData>({
@@ -34,66 +34,29 @@ const CertificateForm: React.FC = () => {
 
   const [generatedCert, setGeneratedCert] = useState<GeneratedCertificate | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // IPアドレスの自動取得
-    const getLocalIP = async () => {
+    const fetchIP = async () => {
       try {
-        const response = await fetch('https://api.ipify.org?format=json');
-        const data = await response.json();
+        const ip = await getLocalIPAddress();
         setFormData(prev => ({
           ...prev,
-          commonName: data.ip
+          commonName: ip
         }));
       } catch (error) {
         console.error('IPアドレスの取得に失敗しました:', error);
-        // ローカルIPアドレスの取得を試みる
-        try {
-          const localIP = await getLocalIPAddress();
-          setFormData(prev => ({
-            ...prev,
-            commonName: localIP
-          }));
-        } catch (error) {
-          console.error('ローカルIPアドレスの取得に失敗しました:', error);
-        }
+        setFormData(prev => ({
+          ...prev,
+          commonName: window.location.hostname || 'localhost'
+        }));
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    getLocalIP();
+    fetchIP();
   }, []);
-
-  const getLocalIPAddress = async (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const RTCPeerConnection = window.RTCPeerConnection || 
-        (window as any).webkitRTCPeerConnection || 
-        (window as any).mozRTCPeerConnection;
-
-      if (!RTCPeerConnection) {
-        reject(new Error('RTCPeerConnection is not supported'));
-        return;
-      }
-
-      const pc = new RTCPeerConnection({ iceServers: [] });
-      pc.createDataChannel('');
-      pc.createOffer()
-        .then(offer => pc.setLocalDescription(offer))
-        .catch(err => reject(err));
-
-      pc.onicecandidate = (event) => {
-        if (!event.candidate) {
-          pc.close();
-          return;
-        }
-        const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/;
-        const match = ipRegex.exec(event.candidate.candidate);
-        if (match) {
-          resolve(match[1]);
-          pc.close();
-        }
-      };
-    });
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
     const { name, value } = e.target;
@@ -142,8 +105,8 @@ const CertificateForm: React.FC = () => {
               name="commonName"
               value={formData.commonName}
               onChange={handleChange}
-              helperText="サーバーのIPアドレス（自動取得）"
-              disabled
+              helperText={isLoading ? "IPアドレスを取得中..." : "サーバーのIPアドレス（自動取得）"}
+              disabled={isLoading}
             />
           </Grid>
           <Grid item xs={12}>
@@ -249,8 +212,9 @@ const CertificateForm: React.FC = () => {
                 variant="contained"
                 color="primary"
                 size="large"
+                disabled={isLoading}
               >
-                証明書を生成
+                {isLoading ? "IPアドレス取得中..." : "証明書を生成"}
               </Button>
             </Box>
           </Grid>
